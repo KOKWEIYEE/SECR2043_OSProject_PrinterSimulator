@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Scheduling Simulator</title>
+    <style>
+        /* General Layout & Font */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #1c3d5a; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
+        /* Controls Section */
+        .controls-container { display: flex; justify-content: space-around; align-items: flex-start; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; padding: 20px; background-color: #fafafa; border-radius: 8px; }
+        .control-group { display: flex; flex-direction: column; gap: 10px; }
+        .control-group label { font-weight: bold; color: #555; }
+        .control-group input[type="number"], .control-group select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 180px; }
+        .control-group button { padding: 10px 15px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
+        #add-job-btn { background-color: #28a745; }
+        #start-btn { background-color: #007bff; }
+        #reset-btn { background-color: #dc3545; }
+        /* Clock & Queues */
+        #simulation-clock { font-size: 1.8em; font-weight: bold; color: #1c3d5a; text-align: center; margin: 20px 0; }
+        .queues-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .queue { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; min-height: 200px; display: flex; flex-direction: column; }
+        .queue h3 { margin-top: 0; text-align: center; color: #495057; margin-bottom: 15px; }
+        /* Job Card */
+        .job-card { position: relative; background-color: #ffffff; border: 1px solid #ddd; border-left-width: 5px; border-left-style: solid; border-radius: 5px; padding: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .job-card.status-completed { opacity: 0.7; }
+        .job-card-header { font-weight: bold; }
+        .job-card-info { font-size: 0.9em; color: #6c757d; }
+        .delete-btn { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border-radius: 50%; border: none; background-color: #dc3545; color: white; font-weight: bold; line-height: 20px; text-align: center; cursor: pointer; opacity: 0.8; }
+        /* Gantt Chart */
+        .gantt-container { margin-top: 30px; overflow-x: auto; padding-bottom: 10px; }
+        .gantt-chart { display: flex; height: 50px; }
+        .gantt-block { height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.9em; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); box-sizing: border-box; border-right: 1px solid rgba(0,0,0,0.1); }
+        .gantt-block:last-child { border-right: none; }
+        .gantt-block-idle { background: repeating-linear-gradient(45deg, #e0e0e0, #e0e0e0 10px, #f0f0f0 10px, #f0f0f0 20px); }
+        .gantt-timeline { position: relative; height: 20px; margin-top: 5px; border-top: 2px solid #ccc; }
+        .gantt-marker { position: absolute; font-size: 0.8em; color: #666; transform: translateX(-50%); padding-top: 5px; }
+        .gantt-marker::before { content: ''; position: absolute; top: -3px; left: 50%; width: 2px; height: 5px; background-color: #666; transform: translateX(-50%); }
+        /* Results Table */
+        .results-container { margin-top: 40px; }
+        #results-table { width: 100%; border-collapse: collapse; text-align: center; }
+        #results-table th, #results-table td { border: 1px solid #ddd; padding: 8px; }
+        #results-table th { background-color: #1c3d5a; color: white; font-weight: bold; }
+        #results-table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+        #results-table tfoot { font-weight: bold; color: #1c3d5a; }
+        /* Log */
+        .log-container { margin-top: 30px; }
+        #log { background-color: #f9f8fa; color: #555; font-family: 'Courier New', Courier, monospace; padding: 15px; height: 250px; overflow-y: scroll; border-radius: 5px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="main-container">
+    <h1>🖨️ Printer Queue Simulator</h1>
+    <div class="controls-container">
+        <!-- Controls... -->
+        <div class="control-group">
+            <label for="job-pages">Number of Pages (Burst):</label>
+            <input type="number" id="job-pages" min="1" value="10">
+            <label for="arrival-time">Arrival Time:</label>
+            <input type="number" id="arrival-time" min="0" value="0">
+            <button id="add-job-btn">Add Job</button>
+        </div>
+        <div class="control-group">
+            <label for="scheduler-type">Scheduler Algorithm:</label>
+            <select id="scheduler-type">
+                <option value="rr">Round Robin</option>
+                <option value="srtf">Shortest Remaining Time First</option>
+            </select>
+            <label for="rr-quantum">Round Robin Quantum:</label>
+            <input type="number" id="rr-quantum" value="5" min="1">
+            <button id="start-btn">Start Simulation</button>
+            <button id="reset-btn">Reset Simulation</button>
+        </div>
+    </div>
+    <div id="simulation-clock">Time: 0s</div>
+    <div class="queues-container">
+        <div class="queue" id="future-queue-container"><h3>Upcoming Jobs</h3><div id="future-queue"></div></div>
+        <div class="queue" id="printer-container"><h3>Now Printing</h3><div id="printer"></div></div>
+        <div class="queue" id="completed-queue-container"><h3>Completed Jobs</h3><div id="completed-jobs"></div></div>
+    </div>
+    <div class="gantt-container">
+        <h2>Gantt Chart (Timeline)</h2>
+        <div class="gantt-chart" id="gantt-chart"></div>
+        <div class="gantt-timeline" id="gantt-timeline"></div>
+    </div>
+    <div class="results-container" id="results-container" style="display: none;">
+        <h2>Performance Metrics</h2>
+        <table id="results-table">
+            <thead>
+                <tr>
+                    <th>Job</th>
+                    <th>Arrival Time</th>
+                    <th>Burst Time</th>
+                    <th>Start Time</th>
+                    <th>Completion Time</th>
+                    <th>Turnaround Time</th>
+                    <th>Waiting Time</th>
+                </tr>
+            </thead>
+            <tbody id="results-table-body"></tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="5">Averages</td>
+                    <td id="avg-tat">0</td>
+                    <td id="avg-wt">0</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <div class="log-container">
+        <h2>Action Log</h2>
+        <div id="log">Welcome! Add jobs and start the simulation.</div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM Elements & State ---
+    const mainContainer = document.getElementById('main-container');
+    const jobPagesInput = document.getElementById('job-pages');
+    const arrivalTimeInput = document.getElementById('arrival-time');
+    const addJobBtn = document.getElementById('add-job-btn');
+    const startBtn = document.getElementById('start-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const schedulerTypeSelect = document.getElementById('scheduler-type');
+    const rrQuantumInput = document.getElementById('rr-quantum');
+    const clockEl = document.getElementById('simulation-clock');
+    const futureQueueEl = document.getElementById('future-queue');
+    const printerEl = document.getElementById('printer');
+    const completedJobsEl = document.getElementById('completed-jobs');
+    const logEl = document.getElementById('log');
+    const ganttChartEl = document.getElementById('gantt-chart');
+    const ganttTimelineEl = document.getElementById('gantt-timeline');
+    const resultsContainer = document.getElementById('results-container');
+    const resultsTableBody = document.getElementById('results-table-body');
+    const avgTatEl = document.getElementById('avg-tat');
+    const avgWtEl = document.getElementById('avg-wt');
+    let allJobs = [];
+    let futureJobs = [];
+    let readyQueue = [];
+    let completedJobs = [];
+    let currentJob = null;
+    let simulationInterval = null;
+    let uniqueId = 0;
+    let quantumCounter = 0;
+    let currentTime = 0;
+    let ganttData = [];
+    const colorPalette = ['#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4'];
+    const PIXELS_PER_SECOND = 30;
+
+    // --- Core Functions ---
+    const log = (message) => {
+        const timePrefix = `T=${currentTime}: `.padStart(6, ' ');
+        logEl.innerHTML = `${timePrefix}${message}\n` + logEl.innerHTML;
+    };
+    const renderJobCard = (job) => {
+        const card = document.createElement('div');
+        card.className = `job-card status-${job.status}`;
+        card.id = `job-${job.id}`;
+        card.style.borderLeftColor = job.color;
+        const deleteButtonHtml = !simulationInterval ? `<button class="delete-btn" data-job-id="${job.id}">X</button>` : '';
+        card.innerHTML = `${deleteButtonHtml}<div class="job-card-header">${job.name}</div><div class="job-card-info">Arrived: ${job.arrivalTime}s | Burst: ${job.totalPages}s | Left: ${job.pagesLeft}s</div>`;
+        return card;
+    };
+    const renderAll = () => {
+        clockEl.textContent = `Time: ${currentTime}s`;
+        futureQueueEl.innerHTML = '';
+        printerEl.innerHTML = '';
+        completedJobsEl.innerHTML = '';
+        futureJobs.forEach(job => futureQueueEl.appendChild(renderJobCard(job)));
+        if (currentJob) printerEl.appendChild(renderJobCard(currentJob));
+        completedJobs.forEach(job => completedJobsEl.appendChild(renderJobCard(job)));
+    };
+    const renderGanttChart = () => {
+        ganttChartEl.innerHTML = '';
+        ganttTimelineEl.innerHTML = '';
+        if (ganttData.length === 0) return;
+        const processedBlocks = [];
+        if (ganttData.length > 0) {
+            let currentBlock = { ...ganttData[0], duration: 0, startTime: ganttData[0].time };
+            for (const entry of ganttData) {
+                if (entry.jobId === currentBlock.jobId) currentBlock.duration++;
+                else {
+                    processedBlocks.push(currentBlock);
+                    currentBlock = { ...entry, duration: 1, startTime: entry.time };
+                }
+            }
+            processedBlocks.push(currentBlock);
+        }
+        const totalPixelWidth = currentTime * PIXELS_PER_SECOND;
+        ganttChartEl.style.width = `${totalPixelWidth}px`;
+        ganttTimelineEl.style.width = `${totalPixelWidth}px`;
+        processedBlocks.forEach(block => {
+            const div = document.createElement('div');
+            div.className = 'gantt-block';
+            div.style.width = `${block.duration * PIXELS_PER_SECOND}px`;
+            if (block.jobId === 'idle') div.classList.add('gantt-block-idle');
+            else {
+                const job = allJobs.find(j => j.id === block.jobId);
+                div.style.backgroundColor = job.color;
+                if (block.duration > 0) div.textContent = block.jobName.replace('Job ', '');
+            }
+            ganttChartEl.appendChild(div);
+        });
+        const addedMarkers = new Set();
+        const createMarker = (time) => {
+            if (addedMarkers.has(time) || currentTime === 0) return;
+            const marker = document.createElement('div');
+            marker.className = 'gantt-marker';
+            marker.textContent = time;
+            marker.style.left = `${time * PIXELS_PER_SECOND}px`;
+            ganttTimelineEl.appendChild(marker);
+            addedMarkers.add(time);
+        };
+        createMarker(0);
+        processedBlocks.forEach(block => createMarker(block.startTime));
+        createMarker(currentTime);
+    };
+    const renderResultsTable = () => {
+        resultsTableBody.innerHTML = '';
+        let totalTat = 0;
+        let totalWt = 0;
+        completedJobs.sort((a, b) => a.id - b.id);
+        completedJobs.forEach(job => {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${job.name}</td><td>${job.arrivalTime}</td><td>${job.totalPages}</td><td>${job.startTime}</td><td>${job.completionTime}</td><td>${job.turnaroundTime}</td><td>${job.waitingTime}</td>`;
+            resultsTableBody.appendChild(row);
+            totalTat += job.turnaroundTime;
+            totalWt += job.waitingTime;
+        });
+        const jobCount = completedJobs.length;
+        if(jobCount > 0){
+            avgTatEl.textContent = (totalTat / jobCount).toFixed(2);
+            avgWtEl.textContent = (totalWt / jobCount).toFixed(2);
+        }
+        resultsContainer.style.display = 'block';
+    };
+
+    const addJob = () => {
+        const name = `Job #${uniqueId + 1}`;
+        const pages = parseInt(jobPagesInput.value);
+        const arrival = parseInt(arrivalTimeInput.value);
+        if (isNaN(pages) || pages <= 0 || isNaN(arrival) || arrival < 0) {
+            alert('Please enter valid, positive numbers for pages and arrival time.');
+            return;
+        }
+        const newJob = { id: uniqueId, name, totalPages: pages, pagesLeft: pages, arrivalTime: arrival, status: 'upcoming', color: colorPalette[uniqueId % colorPalette.length], startTime: -1, completionTime: -1, turnaroundTime: -1, waitingTime: -1 };
+        uniqueId++;
+        allJobs.push(newJob);
+        futureJobs.push(newJob);
+        futureJobs.sort((a,b) => a.arrivalTime - b.arrivalTime);
+        log(`Scheduled "${newJob.name}" to arrive at T=${arrival}.`);
+        renderAll();
+    };
+    
+    const reset = () => {
+        clearInterval(simulationInterval);
+        simulationInterval = null;
+        allJobs = [];
+        futureJobs = [];
+        readyQueue = [];
+        completedJobs = [];
+        currentJob = null;
+        uniqueId = 0;
+        currentTime = 0;
+        ganttData = [];
+        ganttChartEl.innerHTML = '';
+        ganttChartEl.style.width = '0px';
+        ganttTimelineEl.innerHTML = '';
+        ganttTimelineEl.style.width = '0px';
+        resultsContainer.style.display = 'none';
+        logEl.innerHTML = 'Simulation reset. Add new jobs to begin.';
+        renderAll();
+    };
+
+    const simulationTick = () => {
+        if (futureJobs.length === 0 && readyQueue.length === 0 && !currentJob) {
+            log('🎉 All jobs completed! Simulation finished.');
+            clearInterval(simulationInterval);
+            simulationInterval = null;
+            renderGanttChart();
+            renderResultsTable();
+            clockEl.textContent = `Time: ${currentTime}s`;
+            return;
+        }
+
+        let newArrivals = false;
+        futureJobs = futureJobs.filter(job => {
+            if (job.arrivalTime <= currentTime) {
+                job.status = 'ready';
+                readyQueue.push(job);
+                log(`📥 "${job.name}" arrived.`);
+                newArrivals = true;
+                return false;
+            }
+            return true;
+        });
+
+        const scheduler = schedulerTypeSelect.value;
+        if (scheduler === 'rr') tickRoundRobin();
+        else if (scheduler === 'srtf') tickSRTF();
+
+        ganttData.push({ time: currentTime, jobId: currentJob ? currentJob.id : 'idle', jobName: currentJob ? currentJob.name : 'Idle' });
+        
+        if(currentJob) {
+            currentJob.pagesLeft--;
+            if (currentJob.pagesLeft <= 0) {
+                currentJob.status = 'completed';
+                currentJob.completionTime = currentTime + 1;
+                currentJob.turnaroundTime = currentJob.completionTime - currentJob.arrivalTime;
+                currentJob.waitingTime = currentJob.turnaroundTime - currentJob.totalPages;
+                completedJobs.push(currentJob);
+                log(`✅ "${currentJob.name}" completed!`);
+                currentJob = null;
+            }
+        }
+        
+        renderAll();
+        currentTime++;
+    };
+    
+    // --- FINAL, CORRECTED SCHEDULING LOGIC ---
+
+    const tickRoundRobin = () => {
+        if (currentJob) {
+            quantumCounter++;
+            if (quantumCounter >= parseInt(rrQuantumInput.value)) {
+                log(`🔄 Quantum used for "${currentJob.name}". Moving to back of queue.`);
+                currentJob.status = 'ready';
+                readyQueue.push(currentJob);
+                currentJob = null;
+            }
+        }
+
+        if (!currentJob && readyQueue.length > 0) {
+            currentJob = readyQueue.shift();
+            currentJob.status = 'printing';
+            if (currentJob.startTime === -1) currentJob.startTime = currentTime;
+            quantumCounter = 0;
+            log(`▶️ Starting "${currentJob.name}".`);
+        }
+    };
+
+    const tickSRTF = () => {
+        const candidates = (currentJob ? [currentJob] : []).concat(readyQueue);
+        if (candidates.length === 0) {
+            currentJob = null;
+            return;
+        }
+        
+        candidates.sort((a,b) => a.pagesLeft - b.pagesLeft);
+        const bestJob = candidates[0];
+
+        if (currentJob !== bestJob) {
+            if(currentJob) {
+                log(`⚡ PREEMPTION! Shorter job "${bestJob.name}" pauses "${currentJob.name}".`);
+                currentJob.status = 'ready';
+                if(!readyQueue.includes(currentJob)) readyQueue.push(currentJob);
+            } else {
+                 log(`▶️ Starting shortest job: "${bestJob.name}" (${bestJob.pagesLeft} pages left).`);
+            }
+            currentJob = bestJob;
+            currentJob.status = 'printing';
+            if(currentJob.startTime === -1) currentJob.startTime = currentTime;
+            
+            // Remove the new currentJob from the ready queue
+            const index = readyQueue.indexOf(currentJob);
+            if (index > -1) readyQueue.splice(index, 1);
+        }
+    };
+    
+    // --- Event Listeners ---
+    addJobBtn.addEventListener('click', addJob);
+    resetBtn.addEventListener('click', reset);
+    startBtn.addEventListener('click', () => {
+        if (simulationInterval) return;
+        if (allJobs.length === 0) { log("Cannot start: No jobs scheduled."); return; }
+        const scheduler = schedulerTypeSelect.value.toUpperCase();
+        log(`--- Starting ${scheduler} Simulation ---`);
+        simulationTick(); 
+        simulationInterval = setInterval(simulationTick, 1000);
+        renderAll();
+    });
+    mainContainer.addEventListener('click', (event) => {
+        if (event.target.classList.contains('delete-btn')) {
+            const jobId = parseInt(event.target.dataset.jobId, 10);
+            const jobToDelete = allJobs.find(j => j.id === jobId);
+            if(jobToDelete) {
+                allJobs = allJobs.filter(j => j.id !== jobId);
+                futureJobs = futureJobs.filter(j => j.id !== jobId);
+                log(`🗑️ Deleted ${jobToDelete.name}.`);
+                renderAll();
+            }
+        }
+    });
+    renderAll();
+});
+</script>
+
+</body>
+</html>
